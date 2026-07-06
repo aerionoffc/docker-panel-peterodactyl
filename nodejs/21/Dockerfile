@@ -1,7 +1,7 @@
 FROM        --platform=$TARGETOS/$TARGETARCH node:21-bookworm-slim
-LABEL author="skynest" maintainer="custom@pterodactyl.io"
+LABEL author="aerion" maintainer="custom@pterodactyl.io"
 
-RUN useradd -m -d /home/container container
+RUN useradd -m -d /home/container -s /bin/bash container
 STOPSIGNAL SIGINT
 
 RUN apt update \
@@ -32,9 +32,70 @@ RUN apt update \
         libjpeg-dev \
         libgif-dev \
         librsvg2-dev \
-        chromium \
         libx11-6 \
         libx11-xcb1 \
+        libxcb1 \
+        libxcomposite1 \
+        libxcursor1 \
+        libxdamage1 \
+        libxext6 \
+        libxfixes3 \
+        libxi6 \
+        libxrandr2 \
+        libxrender1 \
+        libxss1 \
+        libxtst6 \
+        fonts-liberation \
+        libappindicator3-1 \
+        libasound2 \
+        libatk-bridge2.0-0 \
+        libatk1.0-0 \
+        libcups2 \
+        libdbus-1-3 \
+        libdrm2 \
+        libgbm1 \
+        libgtk-3-0 \
+        libnspr4 \
+        libnss3 \
+        libxshmfence1 \
+    && rm -rf /var/lib/apt/lists/*
+RUN apt-get update  \
+    && for pkg in chromium chromium-browser; do  \
+         if apt-cache show "$pkg" >/dev/null 2>&1; then  \
+           apt-get install -y --no-install-recommends "$pkg" && break;  \
+         fi;  \
+       done  \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p --mode=0755 /usr/share/keyrings \
+    && curl -fsSL https://pkg.cloudflare.com/cloudflare-public-v2.gpg -o /usr/share/keyrings/cloudflare-public-v2.gpg \
+    && echo 'deb [signed-by=/usr/share/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared any main' > /etc/apt/sources.list.d/cloudflared.list \
+    && apt update \
+    && apt -y install cloudflared \
+    && apt clean \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
+RUN npm install -g corepack
+RUN corepack enable
+RUN corepack prepare pnpm@latest --activate
+RUN corepack exec pnpm -- config set --global dangerouslyAllowAllBuilds true || true
+
+RUN mkdir -p /ms-playwright && chown -R container:container /ms-playwright
+
+USER container
+ENV USER=container HOME=/home/container
+WORKDIR /home/container
+
+COPY --chown=container:container ../entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/usr/bin/tini", "-g", "--"]
+CMD ["/entrypoint.sh"]        libx11-xcb1 \
         libxcb1 \
         libxcomposite1 \
         libxcursor1 \
