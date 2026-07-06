@@ -1,7 +1,7 @@
 FROM        --platform=$TARGETOS/$TARGETARCH node:18-bookworm-slim
-LABEL author="skynest" maintainer="custom@pterodactyl.io"
+LABEL author="siputzx" maintainer="custom@pterodactyl.io"
 
-RUN useradd -m -d /home/container container
+RUN useradd -m -d /home/container -s /bin/bash container
 STOPSIGNAL SIGINT
 
 RUN apt update \
@@ -32,7 +32,6 @@ RUN apt update \
         libjpeg-dev \
         libgif-dev \
         librsvg2-dev \
-        chromium \
         libx11-6 \
         libx11-xcb1 \
         libxcb1 \
@@ -60,6 +59,13 @@ RUN apt update \
         libnss3 \
         libxshmfence1 \
     && rm -rf /var/lib/apt/lists/*
+RUN apt-get update  \
+    && for pkg in chromium chromium-browser; do  \
+         if apt-cache show "$pkg" >/dev/null 2>&1; then  \
+           apt-get install -y --no-install-recommends "$pkg" && break;  \
+         fi;  \
+       done  \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p --mode=0755 /usr/share/keyrings \
     && curl -fsSL https://pkg.cloudflare.com/cloudflare-public-v2.gpg -o /usr/share/keyrings/cloudflare-public-v2.gpg \
@@ -70,11 +76,16 @@ RUN mkdir -p --mode=0755 /usr/share/keyrings \
     && rm -rf /var/lib/apt/lists/*
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
-    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium \
+    PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 RUN npm install -g corepack
 RUN corepack enable
 RUN corepack prepare pnpm@latest --activate
+RUN corepack exec pnpm -- config set --global dangerouslyAllowAllBuilds true || true
+
+RUN mkdir -p /ms-playwright && chown -R container:container /ms-playwright
 
 USER container
 ENV USER=container HOME=/home/container
